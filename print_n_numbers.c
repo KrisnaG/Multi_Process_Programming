@@ -8,7 +8,9 @@
  * child process, printing half the numbers in the
  * child process and the rest in the parent process.
  * 
- * @param n amount of numbers to print (starts at 0)
+ * Print out starts at 0.
+ * 
+ * @param n amount of numbers to print (must be non negative)
  */
 void print_n_numbers(int n) 
 {
@@ -34,7 +36,7 @@ void print_n_numbers(int n)
                 printf("No child to wait for!\n");
             }
             else {
-                for (int i = half; i <= n; ++i) {
+                for ( int i = half; i <= n; ++i ) {
                     printf("%d ", i);
                 }
             }
