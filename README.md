@@ -1,9 +1,11 @@
-# Multi_Process_Programming
+# Multi_Process_and_Threaded_Programming
 
-Some functions utilising multi-process programming to complete a task/problem.
+Uutilising multi-process and multi-threaded programming to complete a task/problem.
 
-These functions will be using the fork(), which can only be run on Linux systems.
+These programs will use system calls which can only be run on Linux systems.
 
-### Functions
+### Practice Functions
 * print_n_numbers(n)
 * sum_int_array(array)
+
+### Parallel Search
