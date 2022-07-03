@@ -1,0 +1,1 @@
+gcc generate_ciphertext.c -lcrypto -o generate_ciphertext -Wall
