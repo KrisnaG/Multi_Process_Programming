@@ -1,37 +1,21 @@
-gcc generate_ciphertext.c -lcrypto -o generate_ciphertext -Wall
-
-
 COMPILER = gcc
-CFLAGS = -Wall -pedantic
+CFLAGS = -Wall -pedantic -g
+COBJS = ring_util.o
+CEXES = generate_ciphertext decrypt_ciphertext parallel_search_keyspace
 
-COBJS = makeargv.o
+all: ${CEXES}
 
-EXES = 
+generate_ciphertext: generate_ciphertext.c
+	${COMPILER} ${CFLAGS} generate_ciphertext.c -lcrypto -o generate_ciphertext -Wall
 
-all: ${EXES}
+decrypt_ciphertext: decrypt_ciphertext.c
+	${COMPILER} ${CFLAGS} decrypt_ciphertext.c -lcrypto -o decrypt_ciphertext -Wall
 
-
-
-
-
-prints_args:  prints_args.c 
-	${COMPILER} ${CFLAGS}  prints_args.c -o prints_args
-
-process_chain_args:  process_chain_args.c 
-	${COMPILER} ${CFLAGS}  process_chain_args.c -o process_chain_args
-
-process_chain_exec:  process_chain_exec.c 
-	${COMPILER} ${CFLAGS}  process_chain_exec.c -o process_chain_exec
-
-tokenAt: tokenAt.c ${COBJS}
-	${COMPILER} ${CFLAGS} tokenAt.c ${COBJS}  -o tokenAt
+parallel_search_keyspace: parallel_search_keyspace.c ${COBJS}
+	${COMPILER} ${CFLAGS} parallel_search_keyspace.c ${COBJS} -o parallel_search_keyspace
 
 %.o: %.c %.h  makefile
-	${COMPILER} ${CFLAGS} $< -c 
+	${COMPILER} ${CFLAGS} $< -c
 
-
-
-
-
-clean: 
-	rm -f *~ *.o ${EXES} ${COBJS} tokenAt
+clean:
+	rm -f *.o *~ ${CEXES}

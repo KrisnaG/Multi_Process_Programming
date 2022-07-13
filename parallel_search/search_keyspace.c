@@ -129,7 +129,7 @@ main (int argc, char **argv)
   int cipher_length, plain_length;
 
   key_data = (unsigned char *) argv[1];
-  key_data_len = strlen (argv[1]);
+  key_data_len = strlen(argv[1]);
 
   // Read encrypted bytes from file
   //TODO: Make this more dynamic
@@ -207,7 +207,7 @@ main (int argc, char **argv)
   //Hint - Divide this space over the processes
   //(can divide/assign permutations by methods other than 
   //bitwise operations if desired)
-
+  
   //TODO: This is the processing that needs to be parallelized.
   //The processing in this loop needs to be divided based upon the
   //number of processes used.
@@ -273,4 +273,5 @@ main (int argc, char **argv)
        */
 
     }
+return(0);
 }
