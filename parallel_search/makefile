@@ -2,7 +2,7 @@
 
 COMPILER = gcc
 CFLAGS = -Wall -pedantic -g
-COBJS = ring_util.o aes_util.o
+COBJS = parallel_search_util.o
 CEXES = generate_ciphertext decrypt_ciphertext parallel_search_keyspace
 
 all: ${CEXES}

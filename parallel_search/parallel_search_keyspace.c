@@ -11,26 +11,7 @@
 #include <errno.h>
 #include <openssl/evp.h>
 #include <openssl/aes.h>
-#include "ring_util.h"
-#include "aes_util.h"
-
-/**
- * @brief 
- * 
- * @param argc 
- * @param argv 
- * @param np 
- * @return int 
- */
-int parse_args(int argc,  char *argv[], int *np)
-{
-    if ( (argc != 5) || ((*np = atoi (argv[1])) <= 0) ) {
-        fprintf(stderr, "Usage: %s <num. procs.> <partial key> <cipher file> <plain file>\n", argv[0]);
-        return(-1);
-    }
-
-    return(0);
-}
+#include "parallel_search_util.h"
 
 /**
  * @brief 
@@ -84,8 +65,9 @@ int main(int argc,  char *argv[ ])
     int childpid;               // indicates process should spawn another
     int nprocs;                 // total number of processes in ring
     int process;
-    unsigned long partition_start;
-    unsigned long partition_end;
+    unsigned long partition_start = 0, partition_end = 0;
+    message_t message;
+    size_t message_size = sizeof(message);
 
     /* encryption/decryption related variables */
     unsigned char *key_data;    // Pointers to key data location
@@ -185,22 +167,21 @@ int main(int argc,  char *argv[ ])
         if (childpid) break; 
     }
 
-    typedef struct {
-        unsigned char key[32];
-        long key_number;
-    } message_t;
-
-    message_t message;
-    size_t message_size = sizeof(message);
-
     if (process == 0) {
         // parent process
-        if (read(STDIN_FILENO, &message, message_size) == sizeof(message)) {
-            if (message.key != NULL) {
-                if (write(STDOUT_FILENO, &message, message_size) < 0) {
+        message.key_number = -1;
+        if (write(STDOUT_FILENO, &message, message_size) < 0) {
                     fprintf(stderr, "Error writing");
+        }
+        if (read(STDIN_FILENO, &message, message_size) == sizeof(message)) {
+            if (message.key_number != -1) {
+                // test key was passed correctly
+                if (test_key(keyLowBits, message.key_number, &plaintext, cipher_in, 
+                cipher_length, trialkey, trial_key_length) < 0) {
+                    fprintf(stderr, "Couldn't initialize AES cipher\n");
                 }
-                fprintf(stderr, "\nOK: enc/dec ok for \"\"\n");
+                // print results to user
+                fprintf(stderr, "\nOK: enc/dec ok for \"%s\"\n", plaintext);
 	            fprintf(stderr, "Key No.:%ld:", message.key_number);
                 int y;
 	            for (y = 0; y < 32; y++) {
@@ -208,6 +189,7 @@ int main(int argc,  char *argv[ ])
                 }
 	            fprintf(stderr, "\n");
             } else {
+                // no key found
                 fprintf(stderr, "Key not found\n");
             }
         }
@@ -216,7 +198,6 @@ int main(int argc,  char *argv[ ])
 
         // partition unknown permutations
         partition_start = (maxSpace / (nprocs)) * (process-1);
-        
         if (process == nprocs)
             partition_end = maxSpace;
         else
@@ -224,53 +205,29 @@ int main(int argc,  char *argv[ ])
         
         // Iterate over total number of unknown permutations
         for (; partition_start < partition_end; ++partition_start) {
-
-            //OR the low bits of the key with the counter to get next test key
-            unsigned long trialLowBits = keyLowBits | partition_start;
-            //Unpack these bits into the end of the trial key array
-            trialkey[25] = (unsigned char) (trialLowBits >> 48);
-            trialkey[26] = (unsigned char) (trialLowBits >> 40);
-            trialkey[27] = (unsigned char) (trialLowBits >> 32);
-            trialkey[28] = (unsigned char) (trialLowBits >> 24);
-            trialkey[29] = (unsigned char) (trialLowBits >> 16);
-            trialkey[30] = (unsigned char) (trialLowBits >> 8);
-            trialkey[31] = (unsigned char) (trialLowBits);
-            //Set up the encryption device
-            EVP_CIPHER_CTX *en = EVP_CIPHER_CTX_new ();
-            EVP_CIPHER_CTX *de = EVP_CIPHER_CTX_new ();
-            //Initialise the encryption device
-            if (aes_init (trialkey, trial_key_length, en, de)) {
-                printf ("Couldn't initialize AES cipher\n");
-                return -1;
+            
+            if (test_key(keyLowBits, partition_start, &plaintext, cipher_in, 
+            cipher_length, trialkey, trial_key_length) == - 1) {
+                fprintf(stderr, "Couldn't initialize AES cipher\n");
             }
 
-            // Test permutation of the key to see if we get the desired plain text
-            plaintext = (char *) aes_decrypt (de,
-                            (unsigned char *) cipher_in,
-                            &cipher_length);
-
-            // Cleanup Cipher Allocated memory
-            EVP_CIPHER_CTX_cleanup (en);
-            EVP_CIPHER_CTX_cleanup (de);
-            EVP_CIPHER_CTX_free (en);
-            EVP_CIPHER_CTX_free (de);
-
-            // key found
+            // key found - forward message to neighbour process
             if (strncmp(plaintext, plain_in, plain_length) == 0) {
-                // send key to next process
                 memcpy(message.key, trialkey, sizeof(trialkey));
                 message.key_number = partition_start;
+                // send key to next process
                 if (write(STDOUT_FILENO, &message, message_size) < 0) {
                     fprintf(stderr, "Error writing");
                 }
+                
                 free(plaintext);
-                break;
+                exit(EXIT_SUCCESS);
             }
 
             free(plaintext);
         }
 
-        //if (read(STDIN_FILENO, key_found, SIZE) == sizeof(key_found)) {
+        // key not found in worker - wait and forward message from neighbour process
         if (read(STDIN_FILENO, &message, message_size) == sizeof(message)) {
             if (write(STDOUT_FILENO, &message, message_size) < 0) {
                 fprintf(stderr, "Error writing");
