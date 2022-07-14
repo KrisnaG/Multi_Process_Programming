@@ -12,6 +12,7 @@
 #include <openssl/evp.h>
 #include <openssl/aes.h>
 #include "ring_util.h"
+#include "aes_util.h"
 
 /**
  * @brief 
@@ -21,7 +22,7 @@
  * @param np 
  * @return int 
  */
-int parse_args(int argc,  char *argv[ ], int *np)
+int parse_args(int argc,  char *argv[], int *np)
 {
     if ( (argc != 5) || ((*np = atoi (argv[1])) <= 0) ) {
         fprintf(stderr, "Usage: %s <num. procs.> <partial key> <cipher file> <plain file>\n", argv[0]);
@@ -95,8 +96,8 @@ int main(int argc,  char *argv[ ])
     int cipher_length, plain_length;
     
 
-    key_data = (unsigned char *) argv[1];
-    key_data_len = strlen(argv[1]);
+    key_data = (unsigned char *) argv[2];
+    key_data_len = strlen(argv[2]);
 
     if (parse_args(argc, argv, &nprocs) < 0)
         exit(EXIT_FAILURE);
@@ -168,14 +169,13 @@ int main(int argc,  char *argv[ ])
     maxSpace =
         ((unsigned long) 1 << ((trial_key_length - key_data_len) * 8)) - 1;
 
-    printf(": %ld\n", maxSpace);
 
     if (make_trivial_ring() < 0) {
         perror("Could not make trivial ring");
         exit(EXIT_FAILURE);
     }
 
-    for (process = 1; process < nprocs;  ++process) {
+    for (process = 0; process < nprocs;  ++process) {
         if(add_new_node(&childpid) < 0){
             perror("Could not add new node to ring");
             exit(EXIT_FAILURE); 
@@ -184,18 +184,47 @@ int main(int argc,  char *argv[ ])
         // parent process
         if (childpid) break; 
     }
-    
-    /* ring process code  */
 
-    if (childpid == 0) {
-        partition_start = (maxSpace / nprocs) * process-1;
+    typedef struct {
+        unsigned char key[32];
+        long key_number;
+    } message_t;
+
+    message_t message;
+    size_t message_size = sizeof(message);
+
+    if (process == 0) {
+        // parent process
+        if (read(STDIN_FILENO, &message, message_size) == sizeof(message)) {
+            if (message.key != NULL) {
+                if (write(STDOUT_FILENO, &message, message_size) < 0) {
+                    fprintf(stderr, "Error writing");
+                }
+                fprintf(stderr, "\nOK: enc/dec ok for \"\"\n");
+	            fprintf(stderr, "Key No.:%ld:", message.key_number);
+                int y;
+	            for (y = 0; y < 32; y++) {
+	                fprintf (stderr, "%c", message.key[y]);
+                }
+	            fprintf(stderr, "\n");
+            } else {
+                fprintf(stderr, "Key not found\n");
+            }
+        }
+    } else {
+        // worker processes
+
+        // partition unknown permutations
+        partition_start = (maxSpace / (nprocs)) * (process-1);
         
-        if (process = nprocs)
-            partition_end = (maxSpace / nprocs) * process;
-        else
+        if (process == nprocs)
             partition_end = maxSpace;
+        else
+            partition_end = (maxSpace / (nprocs)) * (process);
         
-        for (partition_start; partition_start < partition_end; ++partition_start) {
+        // Iterate over total number of unknown permutations
+        for (; partition_start < partition_end; ++partition_start) {
+
             //OR the low bits of the key with the counter to get next test key
             unsigned long trialLowBits = keyLowBits | partition_start;
             //Unpack these bits into the end of the trial key array
@@ -206,21 +235,19 @@ int main(int argc,  char *argv[ ])
             trialkey[29] = (unsigned char) (trialLowBits >> 16);
             trialkey[30] = (unsigned char) (trialLowBits >> 8);
             trialkey[31] = (unsigned char) (trialLowBits);
-
             //Set up the encryption device
             EVP_CIPHER_CTX *en = EVP_CIPHER_CTX_new ();
             EVP_CIPHER_CTX *de = EVP_CIPHER_CTX_new ();
-
             //Initialise the encryption device
             if (aes_init (trialkey, trial_key_length, en, de)) {
-	            printf ("Couldn't initialize AES cipher\n");
-	            return -1;
-	        }
+                printf ("Couldn't initialize AES cipher\n");
+                return -1;
+            }
 
             // Test permutation of the key to see if we get the desired plain text
             plaintext = (char *) aes_decrypt (de,
-					        (unsigned char *) cipher_in,
-					        &cipher_length);
+                            (unsigned char *) cipher_in,
+                            &cipher_length);
 
             // Cleanup Cipher Allocated memory
             EVP_CIPHER_CTX_cleanup (en);
@@ -228,30 +255,27 @@ int main(int argc,  char *argv[ ])
             EVP_CIPHER_CTX_free (en);
             EVP_CIPHER_CTX_free (de);
 
-            //Key match checking
-            //Hint - If key is found(decrypted string matches) return 
-            //value back to parent
-            if (strncmp (plaintext, plain_in, plain_length) == 0) {
-	            printf ("\nOK: enc/dec ok for \"%s\"\n", plaintext);
-	            printf ("Key No.:%ld:", partition_start);
+            // key found
+            if (strncmp(plaintext, plain_in, plain_length) == 0) {
+                // send key to next process
+                memcpy(message.key, trialkey, sizeof(trialkey));
+                message.key_number = partition_start;
+                if (write(STDOUT_FILENO, &message, message_size) < 0) {
+                    fprintf(stderr, "Error writing");
+                }
+                free(plaintext);
+                break;
+            }
 
-	            //Hint - Won't print here(print in parent process)
-	            int y;
-	            for (y = 0; y < 32; y++) {
-	                  printf ("%c", trialkey[y]);
-	            }
-                printf ("\n");
-	            break;
-	        }
-
-            free (plaintext);
-        /*
-         Hint - In child processes make sure to release allocated memory and 
-         if key found return key to parent.
-         Lastly have parent display results.
-        */
-
+            free(plaintext);
         }
+
+        //if (read(STDIN_FILENO, key_found, SIZE) == sizeof(key_found)) {
+        if (read(STDIN_FILENO, &message, message_size) == sizeof(message)) {
+            if (write(STDOUT_FILENO, &message, message_size) < 0) {
+                fprintf(stderr, "Error writing");
+            }
+        } 
     }
 
     exit(EXIT_SUCCESS);
