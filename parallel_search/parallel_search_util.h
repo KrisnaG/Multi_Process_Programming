@@ -4,7 +4,7 @@
 /**
  * @file parallel_search_util.h
  * @author Krisna Gusti (kgusti@myune.edu.au)
- * @brief 
+ * @brief Utility library to support parallel search keyspace.
  */
 
 /* Successful operation */
@@ -26,5 +26,6 @@ int make_trivial_ring();
 int add_new_node(int *pid);
 int test_key(unsigned long keyLowBits, unsigned long testKey, char** plaintext, 
     unsigned char* cipher_in, int cipher_length, unsigned char trialkey[], int trial_key_length);
+int read_file(char *filename, int *file_length, unsigned char *buff);
 
 #endif

@@ -11,53 +11,16 @@
 #include <errno.h>
 #include <openssl/evp.h>
 #include <openssl/aes.h>
+#include <sys/wait.h>
 #include "parallel_search_util.h"
 
 /**
- * @brief 
- * 
- * @return int 
- */
-int read_file(char *filename, int *file_length, unsigned char *buff)
-{
-    FILE *file;
-    
-    if ((file = fopen(filename, "r")) == NULL) {
-        perror("File error");
-        return(-1);
-    }
-
-    // obtain file size
-    fseek(file, 0, SEEK_END);
-    *file_length = ftell(file);
-    rewind(file);   
-    
-    // allocate memory
-    buff = (unsigned char*) malloc (sizeof(unsigned char)*(*file_length));
-    if (buff == NULL) {
-        perror("Memory error");
-        return(-1);
-    }
-
-    if (fread(buff, *file_length, 1, file) != 1) {
-        perror("Reading error");
-        return(-1);
-    }
-
-    // free memory
-    fclose(file);
-
-    return(0);
-}
-
-
-
-/**
- * @brief 
+ * @brief Main program that utilises a AES key search using n number of processes
+ * given by the user.
  * 
  * @param argc 
  * @param argv 
- * @return int 
+ * @return 0 on Success, key printed to stderr 
  */
 int main(int argc,  char *argv[ ])
 {
@@ -162,7 +125,6 @@ int main(int argc,  char *argv[ ])
             perror("Could not add new node to ring");
             exit(EXIT_FAILURE); 
         }
-        
         // parent process
         if (childpid) break; 
     }
@@ -170,6 +132,7 @@ int main(int argc,  char *argv[ ])
     if (process == 0) {
         // parent process
         message.key_number = -1;
+        memcpy(message.key, trialkey, sizeof(trialkey));
         if (write(STDOUT_FILENO, &message, message_size) < 0) {
                     fprintf(stderr, "Error writing");
         }
@@ -188,6 +151,7 @@ int main(int argc,  char *argv[ ])
 	                fprintf (stderr, "%c", message.key[y]);
                 }
 	            fprintf(stderr, "\n");
+                free(plaintext);
             } else {
                 // no key found
                 fprintf(stderr, "Key not found\n");
@@ -220,7 +184,9 @@ int main(int argc,  char *argv[ ])
                     fprintf(stderr, "Error writing");
                 }
                 
+                // free memory and clear buffer
                 free(plaintext);
+                read(STDIN_FILENO, &message, message_size);
                 exit(EXIT_SUCCESS);
             }
 

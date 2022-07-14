@@ -1,7 +1,7 @@
 /**
  * @file parallel_search_util.c
  * @author Krisna Gusti (kgusti@myune.edu.au)
- * @brief 
+ * @brief Utility library to support parallel search keyspace.
  */
 
 #include <stdlib.h>
@@ -10,20 +10,16 @@
 #include <openssl/aes.h>
 #include "parallel_search_util.h"
 
-/*****************************************************************************
- * Function: aes_init
- * 
- * Initialises the aes encryption struct using the provided key, key length,
+/**
+ * @brief Initialises the aes encryption struct using the provided key, key length,
  * and the EVP_aes_256_cbc() mode.
  * 
- * Parameters: 
- *     unsigned char *key_data - Pointer to the Key
- *     int key_data_len - The length of the key 
- *     EVP_CIPHER_CTX *e_ctx - Pointer to the encryption device
- *     EVP_CIPHER_CTX *d_ctx - Pointer to the decryption device
- * 
- * Returns: 0 on Success
- * ***************************************************************************/
+ * @param key_data Pointer to the Key
+ * @param key_data_len The length of the key 
+ * @param e_ctx Pointer to the encryption device
+ * @param d_ctx Pointer to the decryption device
+ * @return 0 on Success 
+ */
 int aes_init (unsigned char *key_data, int key_data_len, 
     EVP_CIPHER_CTX * e_ctx,EVP_CIPHER_CTX * d_ctx)
 {
@@ -51,36 +47,46 @@ int aes_init (unsigned char *key_data, int key_data_len,
   
     //Create and initialize the encryption device.
     EVP_CIPHER_CTX_init(e_ctx);
-    EVP_EncryptInit_ex(e_ctx, EVP_aes_256_cbc (), NULL, key, iv);
     EVP_CIPHER_CTX_init(d_ctx);
-    EVP_DecryptInit_ex(d_ctx, EVP_aes_256_cbc (), NULL, key, iv);
+
+    if (EVP_EncryptInit_ex(e_ctx, EVP_aes_256_cbc (), NULL, key, iv) == 0 ||
+        EVP_DecryptInit_ex(d_ctx, EVP_aes_256_cbc (), NULL, key, iv) == 0) 
+        return(-1);
 
     return 0;
 }
 
-/*
- * Decrypt *len bytes of ciphertext
- * All data going in & out is considered binary (unsigned char[])
+/**
+ * @brief Decrypt *len bytes of ciphertext. All data going in & out is considered 
+ * binary (unsigned char[]).
+ * 
+ * NOTE: plaintext is created by malloc and an associated free call is required.
+ * 
+ * @param e Newly created EVP_CIPHER_CTX
+ * @param ciphertext Cipher text
+ * @param len Cipher length
+ * @return unsigned char* 
  */
-unsigned char * aes_decrypt (EVP_CIPHER_CTX * e, 
+unsigned char * aes_decrypt(EVP_CIPHER_CTX * e, 
     unsigned char *ciphertext, int *len)
 {
     /* plaintext will always be equal to or lesser than length of ciphertext*/
     int p_len = *len, f_len = 0;
     unsigned char *plaintext = malloc (p_len);
-    EVP_DecryptInit_ex (e, NULL, NULL, NULL, NULL);
-    EVP_DecryptUpdate (e, plaintext, &p_len, ciphertext, *len);
-    EVP_DecryptFinal_ex (e, plaintext + p_len, &f_len);
+    EVP_DecryptInit_ex(e, NULL, NULL, NULL, NULL);
+    EVP_DecryptUpdate(e, plaintext, &p_len, ciphertext, *len);
+    EVP_DecryptFinal_ex(e, plaintext + p_len, &f_len);
     return plaintext;
 }
 
 /**
- * @brief 
+ * @brief Checks input parameters are the correct size and length.
+ *  <num. procs.> <partial key> <cipher file> <plain file>
  * 
- * @param argc 
- * @param argv 
- * @param np 
- * @return int 
+ * @param argc Number of input parameters
+ * @param argv Input parameter list
+ * @param np Number of processes
+ * @return 0 on success, -1 on failure
  */
 int parse_args(int argc,  char *argv[], int *np)
 {
@@ -93,9 +99,9 @@ int parse_args(int argc,  char *argv[], int *np)
 }
 
 /**
- * @brief 
+ * @brief Create a ring by utilising a pipe to connect the std input and output.
  * 
- * @return int 
+ * @return 0 on success, -2 on pipe failure, -3 on dup2 failure, -4 on close failure 
  */
 int make_trivial_ring()
 {
@@ -115,10 +121,10 @@ int make_trivial_ring()
 }
 
 /**
- * @brief 
+ * @brief Adds a new node to a ring of processes.
  * 
- * @param pid 
- * @return int 
+ * @param pid Process ID of child process
+ * @return 0 on success, -5 & -6 on pipe failure, -7 & -8 on dup2 failure, -9 on close failure  
  */
 int add_new_node(int *pid)
 {
@@ -143,16 +149,16 @@ int add_new_node(int *pid)
 }
 
 /**
- * @brief 
+ * @brief Trails a key through encryption/decryption and outputs result to plaintext
  * 
- * @param keyLowBits 
- * @param testKey 
- * @param plaintext 
- * @param cipher_in 
- * @param cipher_length 
- * @param trialkey 
- * @param trial_key_length 
- * @return int 
+ * @param keyLowBits Packed key bytes
+ * @param testKey Key to test on trial
+ * @param plaintext Pointer to plaintext
+ * @param cipher_in Input Cipher Text
+ * @param cipher_length Input Cipher Text length
+ * @param trialkey Key to trial
+ * @param trial_key_length Trial key length
+ * @return 0 on success, -10 on failure 
  */
 int test_key(unsigned long keyLowBits, unsigned long testKey, char** plaintext, 
     unsigned char* cipher_in, int cipher_length, unsigned char trialkey[], int trial_key_length) 
@@ -171,18 +177,55 @@ int test_key(unsigned long keyLowBits, unsigned long testKey, char** plaintext,
     EVP_CIPHER_CTX *en = EVP_CIPHER_CTX_new ();
     EVP_CIPHER_CTX *de = EVP_CIPHER_CTX_new ();
     //Initialise the encryption device
-    if (aes_init (trialkey, trial_key_length, en, de)) {
+    if (aes_init(trialkey, trial_key_length, en, de) < 0) {
         return(-10);
     }
     // Test permutation of the key to see if we get the desired plain text
-    *plaintext = (char *) aes_decrypt (de,
+    *plaintext = (char *) aes_decrypt(de,
                     (unsigned char *) cipher_in,
                     &cipher_length);
     // Cleanup Cipher Allocated memory
-    EVP_CIPHER_CTX_cleanup (en);
-    EVP_CIPHER_CTX_cleanup (de);
-    EVP_CIPHER_CTX_free (en);
-    EVP_CIPHER_CTX_free (de);
+    EVP_CIPHER_CTX_cleanup(en);
+    EVP_CIPHER_CTX_cleanup(de);
+    EVP_CIPHER_CTX_free(en);
+    EVP_CIPHER_CTX_free(de);
     
     return(SUCCESS);
+}
+
+/**
+ * @brief 
+ * 
+ * @return int 
+ */
+int read_file(char *filename, int *file_length, unsigned char *buff)
+{
+    FILE *file;
+    
+    if ((file = fopen(filename, "r")) == NULL) {
+        perror("File error");
+        return(-1);
+    }
+
+    // obtain file size
+    fseek(file, 0, SEEK_END);
+    *file_length = ftell(file);
+    rewind(file);   
+    
+    // allocate memory
+    buff = (unsigned char*) malloc (sizeof(unsigned char)*(*file_length));
+    if (buff == NULL) {
+        perror("Memory error");
+        return(-1);
+    }
+
+    if (fread(buff, *file_length, 1, file) != 1) {
+        perror("Reading error");
+        return(-1);
+    }
+
+    // free memory
+    fclose(file);
+
+    return(0);
 }
