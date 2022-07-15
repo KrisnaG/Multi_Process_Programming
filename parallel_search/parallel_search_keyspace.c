@@ -22,23 +22,24 @@
  * @param argv 
  * @return 0 on Success, key printed to stderr 
  */
-int main(int argc,  char *argv[ ])
+int main(int argc,  char *argv[])
 {
     /* process related variables */
-    int childpid;               // indicates process should spawn another
-    int nprocs;                 // total number of processes in ring
-    int process;
-    unsigned long partition_start = 0, partition_end = 0;
-    message_t message;
-    size_t message_size = sizeof(message);
+    int childpid;                           // indicates process should spawn another
+    int nprocs;                             // total number of processes in ring
+    int process;                            // process identifier
+    unsigned long partition_start = 0;      // processes start of its allocated partition
+    unsigned long partition_end = 0;        // processes end of its allocated partition
+    message_t message;                      // message for processes to pass on
+    size_t message_size = sizeof(message);  // size of message
 
     /* encryption/decryption related variables */
-    unsigned char *key_data;    // Pointers to key data location
-    int key_data_len, i;        // Key length
-    char *plaintext;            // Pointer to plain text
-    unsigned char key[32];
-    unsigned char trialkey[32];
-    int cipher_length, plain_length;
+    unsigned char *key_data;                // pointers to key data location
+    int key_data_len, i;                    // key length
+    char *plaintext;                        // pointer to plain text
+    unsigned char key[32];                  // 
+    unsigned char trialkey[32];             // 
+    int cipher_length, plain_length;        // cipher and plain text length
     
 
     key_data = (unsigned char *) argv[2];
@@ -48,23 +49,22 @@ int main(int argc,  char *argv[ ])
         exit(EXIT_FAILURE);
 
     // Read encrypted bytes from file
-    //TODO: Make this more dynamic
     FILE *mycipherfile;
     mycipherfile = fopen (argv[3], "r");
     fseek (mycipherfile, 0, SEEK_END);
     cipher_length = ftell (mycipherfile);
     rewind (mycipherfile);
-    unsigned char cipher_in[cipher_length];
+    unsigned char *cipher_in = calloc((cipher_length+1), sizeof(unsigned char));
     fread (cipher_in, cipher_length, 1, mycipherfile);
     fclose (mycipherfile);
-
+    
     // Read decrypted bytes(to cross reference key results) from file
     FILE *myplainfile;
     myplainfile = fopen (argv[4], "r");
     fseek (myplainfile, 0, SEEK_END);
     plain_length = ftell (myplainfile);
     rewind (myplainfile);
-    char plain_in[plain_length];
+    char *plain_in = calloc((plain_length+1), sizeof(char));
     fread (plain_in, plain_length, 1, myplainfile);
     fclose (myplainfile);
 
@@ -74,7 +74,6 @@ int main(int argc,  char *argv[ ])
         printf ("%c", plain_in[y]);
     }
     printf ("\n");
-
     printf ("Ciphertext: %s\n\n", (char *) cipher_in);
 
     // Condition known portion of key
@@ -186,6 +185,8 @@ int main(int argc,  char *argv[ ])
                 
                 // free memory and clear buffer
                 free(plaintext);
+                free(plain_in);
+                free(cipher_in);
                 read(STDIN_FILENO, &message, message_size);
                 exit(EXIT_SUCCESS);
             }
@@ -200,6 +201,7 @@ int main(int argc,  char *argv[ ])
             }
         } 
     }
-
+    free(plain_in);
+    free(cipher_in);
     exit(EXIT_SUCCESS);
 }

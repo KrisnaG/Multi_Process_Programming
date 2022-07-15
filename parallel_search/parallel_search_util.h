@@ -26,6 +26,6 @@ int make_trivial_ring();
 int add_new_node(int *pid);
 int test_key(unsigned long keyLowBits, unsigned long testKey, char** plaintext, 
     unsigned char* cipher_in, int cipher_length, unsigned char trialkey[], int trial_key_length);
-int read_file(char *filename, int *file_length, unsigned char *buff);
+int read_file(char *filename, int *file_length, unsigned char **buff);
 
 #endif

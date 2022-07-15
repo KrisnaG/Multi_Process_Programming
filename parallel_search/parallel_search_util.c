@@ -198,7 +198,7 @@ int test_key(unsigned long keyLowBits, unsigned long testKey, char** plaintext,
  * 
  * @return int 
  */
-int read_file(char *filename, int *file_length, unsigned char *buff)
+int read_file(char *filename, int *file_length, unsigned char **buffer)
 {
     FILE *file;
     
@@ -213,13 +213,13 @@ int read_file(char *filename, int *file_length, unsigned char *buff)
     rewind(file);   
     
     // allocate memory
-    buff = (unsigned char*) malloc (sizeof(unsigned char)*(*file_length));
-    if (buff == NULL) {
+    *buffer = (unsigned char*) malloc (sizeof(unsigned char)*(*file_length));
+    if (buffer == NULL) {
         perror("Memory error");
         return(-1);
     }
 
-    if (fread(buff, *file_length, 1, file) != 1) {
+    if (fread(buffer, *file_length, 1, file) != 1) {
         perror("Reading error");
         return(-1);
     }
