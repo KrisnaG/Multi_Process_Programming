@@ -17,15 +17,15 @@ typedef struct {
 } message_t;
 
 /* Parallel search keyspace utility functions */
+int parse_args(int argc,  char *argv[], int *np);
+int read_file(char *filename, int *file_length, unsigned char **buff);
+int make_trivial_ring();
+int add_new_node(int *pid);
+int test_key(unsigned long keyLowBits, unsigned long testKey, char **plaintext, 
+    unsigned char* cipher_in, int cipher_length, unsigned char trialkey[], int trial_key_length);
 int aes_init(unsigned char *key_data, int key_data_len, 
     EVP_CIPHER_CTX * e_ctx, EVP_CIPHER_CTX * d_ctx);
 unsigned char * aes_decrypt(EVP_CIPHER_CTX * e, 
     unsigned char *ciphertext, int *len);
-int parse_args(int argc,  char *argv[], int *np);
-int make_trivial_ring();
-int add_new_node(int *pid);
-int test_key(unsigned long keyLowBits, unsigned long testKey, char** plaintext, 
-    unsigned char* cipher_in, int cipher_length, unsigned char trialkey[], int trial_key_length);
-int read_file(char *filename, int *file_length, unsigned char **buff);
 
 #endif

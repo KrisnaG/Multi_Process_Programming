@@ -2,16 +2,44 @@
  * @file parallel_search_keyspace.c
  * @author Krisna Gusti (kgusti@myune.edu.au)
  * @brief 
+ * 
+ *  * Cipthertext is printed to the terminal.
+ * Simple program that demonstrates the use of the openSSL library functions
+ * to brute-force search for an AES encryption key given a partial key. This
+ * is a simple single-process version that demonstrates the operations needed
+ * to complete the 
+ * 
+ * Parameters:
+ *      1. Number of processes
+ *      2. Partial key to use for the search
+ *      3. Cipher text file
+ *      4. Plain text file
+ * 
+ * Returns: 0 on Success
+ * 
+ * Library requirements:
+ *      parallel_search_utils.h
+ *      parallel_search_utils.c
+ * 
+ * Build (two methods):
+ *      1. gcc -Wall -pedantic parallel_search_keyspace.c 
+ *             parallel_search_util.c -lcrypto -o parallel_search_keyspace
+ *      2. make (if makefile is included)
+ * 
+ * Run:
+ *      parallel_search_keyspace <num. procs.> <partial key> <cipher file> 
+ *                                                            <plain file>
+ *      e.g. parallel_search_keyspace 3 B1AF2507B69F11CCB3AE2C3592039 
+ *                                    assignment_cipher.txt plain.txt
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <errno.h>
 #include <openssl/evp.h>
 #include <openssl/aes.h>
-#include <sys/wait.h>
+
 #include "parallel_search_util.h"
 
 /**
@@ -37,42 +65,30 @@ int main(int argc,  char *argv[])
     unsigned char *key_data;                // pointers to key data location
     int key_data_len, i;                    // key length
     char *plaintext;                        // pointer to plain text
-    unsigned char key[32];                  // 
-    unsigned char trialkey[32];             // 
+    unsigned char key[32];                  // partial key
+    unsigned char trialkey[32];             // trial key
     int cipher_length, plain_length;        // cipher and plain text length
-    
-
-    key_data = (unsigned char *) argv[2];
-    key_data_len = strlen(argv[2]);
-
+    unsigned char *plain_in;                // plain text from file
+    unsigned char *cipher_in;               // cipher text from file
+      
+    // check input args
     if (parse_args(argc, argv, &nprocs) < 0)
         exit(EXIT_FAILURE);
 
-    // Read encrypted bytes from file
-    FILE *mycipherfile;
-    mycipherfile = fopen (argv[3], "r");
-    fseek (mycipherfile, 0, SEEK_END);
-    cipher_length = ftell (mycipherfile);
-    rewind (mycipherfile);
-    unsigned char *cipher_in = calloc((cipher_length+1), sizeof(unsigned char));
-    fread (cipher_in, cipher_length, 1, mycipherfile);
-    fclose (mycipherfile);
+    // get partial key
+    key_data = (unsigned char *) argv[2];
+    key_data_len = strlen(argv[2]);
     
-    // Read decrypted bytes(to cross reference key results) from file
-    FILE *myplainfile;
-    myplainfile = fopen (argv[4], "r");
-    fseek (myplainfile, 0, SEEK_END);
-    plain_length = ftell (myplainfile);
-    rewind (myplainfile);
-    char *plain_in = calloc((plain_length+1), sizeof(char));
-    fread (plain_in, plain_length, 1, myplainfile);
-    fclose (myplainfile);
+    // read files
+    if (read_file(argv[3], &cipher_length, &cipher_in) < 0 ||
+            read_file(argv[4], &plain_length, &plain_in) < 0)
+        exit(EXIT_FAILURE);
 
+    // printout plain and cipher text from file
     int y;
     printf ("\nPlain: ");
-    for (y = 0; y < plain_length; y++) {
+    for (y = 0; y < plain_length; y++)
         printf ("%c", plain_in[y]);
-    }
     printf ("\n");
     printf ("Ciphertext: %s\n\n", (char *) cipher_in);
 
@@ -113,12 +129,13 @@ int main(int argc,  char *argv[])
     maxSpace =
         ((unsigned long) 1 << ((trial_key_length - key_data_len) * 8)) - 1;
 
-
+    // start ring
     if (make_trivial_ring() < 0) {
         perror("Could not make trivial ring");
         exit(EXIT_FAILURE);
     }
 
+    // spawn child processes and connect to ring
     for (process = 0; process < nprocs;  ++process) {
         if(add_new_node(&childpid) < 0){
             perror("Could not add new node to ring");
@@ -129,28 +146,36 @@ int main(int argc,  char *argv[])
     }
 
     if (process == 0) {
-        // parent process
+        // original parent process
         message.key_number = -1;
         memcpy(message.key, trialkey, sizeof(trialkey));
-        if (write(STDOUT_FILENO, &message, message_size) < 0) {
-                    fprintf(stderr, "Error writing");
-        }
+        
+        // send initial message
+        if (write(STDOUT_FILENO, &message, message_size) < 0) 
+            fprintf(stderr, "Error writing");
+        
+        // wait for neighbour child process message
         if (read(STDIN_FILENO, &message, message_size) == sizeof(message)) {
+            
+            // check if key was found
             if (message.key_number != -1) {
+                
                 // test key was passed correctly
                 if (test_key(keyLowBits, message.key_number, &plaintext, cipher_in, 
-                cipher_length, trialkey, trial_key_length) < 0) {
+                cipher_length, trialkey, trial_key_length) < 0)
                     fprintf(stderr, "Couldn't initialize AES cipher\n");
-                }
+                
                 // print results to user
                 fprintf(stderr, "\nOK: enc/dec ok for \"%s\"\n", plaintext);
 	            fprintf(stderr, "Key No.:%ld:", message.key_number);
                 int y;
-	            for (y = 0; y < 32; y++) {
+	            for (y = 0; y < 32; y++)
 	                fprintf (stderr, "%c", message.key[y]);
-                }
 	            fprintf(stderr, "\n");
+                
+                // free memory
                 free(plaintext);
+
             } else {
                 // no key found
                 fprintf(stderr, "Key not found\n");
@@ -169,39 +194,45 @@ int main(int argc,  char *argv[])
         // Iterate over total number of unknown permutations
         for (; partition_start < partition_end; ++partition_start) {
             
+            // trial key and output into plaintext
             if (test_key(keyLowBits, partition_start, &plaintext, cipher_in, 
-            cipher_length, trialkey, trial_key_length) == - 1) {
+            cipher_length, trialkey, trial_key_length) == - 1)
                 fprintf(stderr, "Couldn't initialize AES cipher\n");
-            }
 
             // key found - forward message to neighbour process
-            if (strncmp(plaintext, plain_in, plain_length) == 0) {
+            if (strncmp(plaintext, (char *)plain_in, plain_length) == 0) {
                 memcpy(message.key, trialkey, sizeof(trialkey));
                 message.key_number = partition_start;
+
                 // send key to next process
-                if (write(STDOUT_FILENO, &message, message_size) < 0) {
+                if (write(STDOUT_FILENO, &message, message_size) < 0)
                     fprintf(stderr, "Error writing");
-                }
                 
-                // free memory and clear buffer
+                // free memory
                 free(plaintext);
                 free(plain_in);
                 free(cipher_in);
+
+                // clear buffer
                 read(STDIN_FILENO, &message, message_size);
+
                 exit(EXIT_SUCCESS);
             }
 
+            // free memory after each iteration
             free(plaintext);
         }
 
         // key not found in worker - wait and forward message from neighbour process
         if (read(STDIN_FILENO, &message, message_size) == sizeof(message)) {
-            if (write(STDOUT_FILENO, &message, message_size) < 0) {
+            if (write(STDOUT_FILENO, &message, message_size) < 0)
                 fprintf(stderr, "Error writing");
-            }
         } 
     }
+
+    // free memory 
     free(plain_in);
     free(cipher_in);
+
     exit(EXIT_SUCCESS);
 }

@@ -1,17 +1,12 @@
-# ./parallel_search_keyspace 5 B1AF2507B69F11CCB3AE2C3592039 assignment_cipher.txt plain.txt
+# makefile for parallel_search_keysapce
+# author: Krisna Gusti (kgusti@myune.edu.au)
 
 COMPILER = gcc
 CFLAGS = -Wall -pedantic -g
 COBJS = parallel_search_util.o
-CEXES = generate_ciphertext decrypt_ciphertext parallel_search_keyspace
+CEXES = parallel_search_keyspace
 
 all: ${CEXES}
-
-generate_ciphertext: generate_ciphertext.c
-	${COMPILER} ${CFLAGS} generate_ciphertext.c -lcrypto -o generate_ciphertext -Wall
-
-decrypt_ciphertext: decrypt_ciphertext.c
-	${COMPILER} ${CFLAGS} decrypt_ciphertext.c -lcrypto -o decrypt_ciphertext -Wall
 
 parallel_search_keyspace: parallel_search_keyspace.c ${COBJS}
 	${COMPILER} ${CFLAGS} parallel_search_keyspace.c ${COBJS} -lcrypto  -o parallel_search_keyspace
