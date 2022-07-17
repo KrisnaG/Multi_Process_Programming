@@ -1,13 +1,15 @@
 /**
  * @file parallel_search_keyspace.c
  * @author Krisna Gusti (kgusti@myune.edu.au)
- * @brief 
+ * @brief A parallel program that uses openSSL library functions to brute
+ * force search an AES encryption key given a partial key, plain text and
+ * cipher text. 
  * 
- *  * Cipthertext is printed to the terminal.
- * Simple program that demonstrates the use of the openSSL library functions
- * to brute-force search for an AES encryption key given a partial key. This
- * is a simple single-process version that demonstrates the operations needed
- * to complete the 
+ * The parent process spawns n given number of processes connected in a 
+ * ring-of-processes topology. Each child process is allocated a subsection
+ * of the search returns its results through the ring to the parent. The 
+ * child process returns immediately after a match was found, otherwise,
+ * it will wait for neighbouring processes to pass the result along.
  * 
  * Parameters:
  *      1. Number of processes
@@ -39,7 +41,6 @@
 #include <string.h>
 #include <openssl/evp.h>
 #include <openssl/aes.h>
-
 #include "parallel_search_util.h"
 
 /**
@@ -54,7 +55,7 @@ int main(int argc,  char *argv[])
 {
     /* process related variables */
     int childpid;                           // indicates process should spawn another
-    int nprocs;                             // total number of processes in ring
+    int nprocs;                             // total number of processes to conduct work
     int process;                            // process identifier
     unsigned long partition_start = 0;      // processes start of its allocated partition
     unsigned long partition_end = 0;        // processes end of its allocated partition
@@ -62,22 +63,17 @@ int main(int argc,  char *argv[])
     size_t message_size = sizeof(message);  // size of message
 
     /* encryption/decryption related variables */
-    unsigned char *key_data;                // pointers to key data location
-    int key_data_len, i;                    // key length
     char *plaintext;                        // pointer to plain text
-    unsigned char key[32];                  // partial key
-    unsigned char trialkey[32];             // trial key
+    unsigned char trialkey[TRIAL_LENGTH];   // trial key
     int cipher_length, plain_length;        // cipher and plain text length
     unsigned char *plain_in;                // plain text from file
     unsigned char *cipher_in;               // cipher text from file
+    unsigned long maxSpace;                 // maximum number of keys possible
+    unsigned long keyLowBits;               // packed key bytes
       
     // check input args
     if (parse_args(argc, argv, &nprocs) < 0)
         exit(EXIT_FAILURE);
-
-    // get partial key
-    key_data = (unsigned char *) argv[2];
-    key_data_len = strlen(argv[2]);
     
     // read files
     if (read_file(argv[3], &cipher_length, &cipher_in) < 0 ||
@@ -92,42 +88,8 @@ int main(int argc,  char *argv[])
     printf ("\n");
     printf ("Ciphertext: %s\n\n", (char *) cipher_in);
 
-    // Condition known portion of key
-    // Only use most significant 32 bytes of data if > 32 bytes
-    if (key_data_len > 32)
-        key_data_len = 32;
-
-    // Copy bytes to the front of the key array
-    for (i = 0; i < key_data_len; i++) {
-        key[i] = key_data[i];
-        trialkey[i] = key_data[i];
-    }
-
-    // If the key data < 32 bytes, pad the remaining bytes with 0s
-    for (i = key_data_len; i < 32; i++) {
-        key[i] = 0;
-        trialkey[i] = 0;
-    }
-
-    // This code packs the last 8 individual bytes of the key into an
-    // unsigned long-type variable that can be easily incremented 
-    // to test key values.
-    unsigned long keyLowBits = 0;
-    keyLowBits = ((unsigned long) (key[24] & 0xFFFF) << 56) |
-        ((unsigned long) (key[25] & 0xFFFF) << 48) |
-        ((unsigned long) (key[26] & 0xFFFF) << 40) |
-        ((unsigned long) (key[27] & 0xFFFF) << 32) |
-        ((unsigned long) (key[28] & 0xFFFF) << 24) |
-        ((unsigned long) (key[29] & 0xFFFF) << 16) |
-        ((unsigned long) (key[30] & 0xFFFF) << 8) |
-        ((unsigned long) (key[31] & 0xFFFF));
-
-    int trial_key_length = 32;
-    unsigned long maxSpace = 0;
-
-    // Work out the maximum number of keys to test
-    maxSpace =
-        ((unsigned long) 1 << ((trial_key_length - key_data_len) * 8)) - 1;
+    // setup key data
+    setup_key(&maxSpace, &keyLowBits, argv[2], trialkey);
 
     // start ring
     if (make_trivial_ring() < 0) {
@@ -162,7 +124,7 @@ int main(int argc,  char *argv[])
                 
                 // test key was passed correctly
                 if (test_key(keyLowBits, message.key_number, &plaintext, cipher_in, 
-                cipher_length, trialkey, trial_key_length) < 0)
+                cipher_length, trialkey, TRIAL_LENGTH) < 0)
                     fprintf(stderr, "Couldn't initialize AES cipher\n");
                 
                 // print results to user
@@ -183,7 +145,6 @@ int main(int argc,  char *argv[])
         }
     } else {
         // worker processes
-
         // partition unknown permutations
         partition_start = (maxSpace / (nprocs)) * (process-1);
         if (process == nprocs)
@@ -196,7 +157,7 @@ int main(int argc,  char *argv[])
             
             // trial key and output into plaintext
             if (test_key(keyLowBits, partition_start, &plaintext, cipher_in, 
-            cipher_length, trialkey, trial_key_length) == - 1)
+            cipher_length, trialkey, TRIAL_LENGTH) == -1)
                 fprintf(stderr, "Couldn't initialize AES cipher\n");
 
             // key found - forward message to neighbour process

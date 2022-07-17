@@ -7,6 +7,7 @@
 
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include <openssl/evp.h>
 #include <openssl/aes.h>
 #include "parallel_search_util.h"
@@ -33,7 +34,8 @@ int parse_args(int argc,  char *argv[], int *np)
 }
 
 /**
- * @brief 
+ * @brief Reads the block of data from a given file and stores it into a block
+ * of memory specified by buffer.
  * 
  * NOTE: buffer is created by calloc and an associated free call is required.
  * 
@@ -76,6 +78,61 @@ int read_file(char *filename, int *file_length, unsigned char **buffer)
 }
 
 /**
+ * @brief Set the up key data from the given input partial key.
+ * 
+ * @param maxSpace Maximum number of keys
+ * @param keyLowBits Packed key bytes
+ * @param input_key Input partial key
+ * @param trialkey Key that will be trialed
+ */
+void setup_key(unsigned long *maxSpace, unsigned long *keyLowBits, char *input_key, 
+unsigned char *trialkey) 
+{
+    unsigned char key[KEY_LENGTH];
+    unsigned char *key_data;
+    int key_data_len, i;
+    
+    // get partial key
+    key_data = (unsigned char *) input_key;
+    key_data_len = strlen(input_key);
+
+    // Condition known portion of key
+    // Only use most significant 32 bytes of data if > 32 bytes
+    if (key_data_len > KEY_LENGTH)
+        key_data_len = KEY_LENGTH;
+
+    // Copy bytes to the front of the key array
+    for (i = 0; i < key_data_len; i++) {
+        key[i] = key_data[i];
+        trialkey[i] = key_data[i];
+    }
+
+    // If the key data < 32 bytes, pad the remaining bytes with 0s
+    for (i = key_data_len; i < KEY_LENGTH; i++) {
+        key[i] = 0;
+        trialkey[i] = 0;
+    }
+
+    // This code packs the last 8 individual bytes of the key into an
+    // unsigned long-type variable that can be easily incremented 
+    // to test key values.
+    *keyLowBits = 0;
+    *keyLowBits = ((unsigned long) (key[24] & 0xFFFF) << 56) |
+        ((unsigned long) (key[25] & 0xFFFF) << 48) |
+        ((unsigned long) (key[26] & 0xFFFF) << 40) |
+        ((unsigned long) (key[27] & 0xFFFF) << 32) |
+        ((unsigned long) (key[28] & 0xFFFF) << 24) |
+        ((unsigned long) (key[29] & 0xFFFF) << 16) |
+        ((unsigned long) (key[30] & 0xFFFF) << 8) |
+        ((unsigned long) (key[31] & 0xFFFF));
+
+    // Work out the maximum number of keys to test
+    *maxSpace = 0;
+    *maxSpace =
+        ((unsigned long) 1 << ((TRIAL_LENGTH - key_data_len) * 8)) - 1;
+}
+
+/**
  * @brief Create a ring by utilising a pipe to connect the std input and output.
  * 
  * @return 0 on success, -1 on pipe failure, -2 on dup2 failure, -3 on close failure 
@@ -101,7 +158,8 @@ int make_trivial_ring()
  * @brief Adds a new node to a ring of processes.
  * 
  * @param pid Process ID of child process
- * @return 0 on success, -1 & -2 on pipe failure, -3 & -4 on dup2 failure, -5 on close failure  
+ * @return 0 on success, -1 & -2 on pipe failure, -3 & -4 on dup2 failure, 
+ * -5 on close failure  
  */
 int add_new_node(int *pid)
 {
