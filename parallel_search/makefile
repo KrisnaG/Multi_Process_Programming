@@ -5,8 +5,10 @@ COMPILER = gcc
 CFLAGS = -Wall -pedantic -g
 COBJS = parallel_search_util.o
 CEXES = parallel_search_keyspace
+PROGRAM = parallel_search_keyspace 
+ARGS = 5 B1AF2507B69F11CCB3AE2C3592039 assignment_cipher.txt plain.txt
 
-all: ${CEXES}
+all: clean ${CEXES} run
 
 parallel_search_keyspace: parallel_search_keyspace.c ${COBJS}
 	${COMPILER} ${CFLAGS} parallel_search_keyspace.c ${COBJS} -lcrypto  -o parallel_search_keyspace
@@ -16,3 +18,6 @@ parallel_search_keyspace: parallel_search_keyspace.c ${COBJS}
 
 clean:
 	rm -f *.o *~ ${CEXES}
+
+run:
+	./${PROGRAM} ${ARGS}

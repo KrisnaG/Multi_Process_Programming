@@ -10,6 +10,7 @@
 #include <string.h>
 #include <openssl/evp.h>
 #include <openssl/aes.h>
+#include <sys/wait.h>
 #include "parallel_search_util.h"
 
 /**
@@ -23,7 +24,7 @@
  */
 int parse_args(int argc,  char *argv[], int *np)
 {
-    if ((argc != 5) || ((*np = atoi (argv[1])) <= 0)) {
+    if ((argc != ARG_LENGTH) || ((*np = atoi (argv[1])) <= 0)) {
         fprintf(stderr, 
                 "Usage: %s <num. procs.> <partial key> <cipher file> <plain file>\n", 
                 argv[0]);
@@ -297,4 +298,41 @@ unsigned char * aes_decrypt(EVP_CIPHER_CTX * e, unsigned char *ciphertext, int *
     EVP_DecryptFinal_ex (e, plaintext + p_len, &f_len);
     
     return(plaintext);
+}
+
+/**
+ * @brief Prints a message of type char array out to stderr
+ * 
+ * @param message message to print
+ * @param length length of message
+ */
+void print_message(unsigned char * message, int length) {
+    int i;
+    for (i = 0; i < length; ++i) {
+        fprintf(stderr, "%c", message[i]);
+    }
+    fprintf(stderr, "\n");
+}
+
+/**
+ * @brief Wait for a given child process to complete
+ * 
+ * @param childpid Child process to wait for
+ * @return 0 on success, -1 no child, -2 abnormal child exit 
+ */
+int wait_for_child(int childpid) {
+    int status;
+    
+    // if process has child process
+    if (childpid > 0) {
+        if (waitpid(childpid, &status, 0) < 0) {
+            fprintf(stderr, "No child to wait for\n");
+            return(-1);
+        } else if (status < 0) {
+            fprintf(stderr, "Child exited with an error\n");
+            return(-2);
+        }
+    }
+
+    return(SUCCESS);
 }

@@ -81,12 +81,9 @@ int main(int argc,  char *argv[])
         exit(EXIT_FAILURE);
 
     // printout plain and cipher text from file
-    int y;
-    printf ("\nPlain: ");
-    for (y = 0; y < plain_length; y++)
-        printf ("%c", plain_in[y]);
-    printf ("\n");
-    printf ("Ciphertext: %s\n\n", (char *) cipher_in);
+    printf("\nPlain: ");
+    print_message(plain_in, plain_length);
+    printf("Ciphertext: %s\n\n", (char *) cipher_in);
 
     // setup key data
     setup_key(&maxSpace, &keyLowBits, argv[2], trialkey);
@@ -99,14 +96,14 @@ int main(int argc,  char *argv[])
 
     // spawn child processes and connect to ring
     for (process = 0; process < nprocs;  ++process) {
-        if(add_new_node(&childpid) < 0){
+        if (add_new_node(&childpid) < 0) {
             perror("Could not add new node to ring");
             exit(EXIT_FAILURE); 
         }
         // parent process
-        if (childpid) break; 
+        if (childpid) break;
     }
-
+    
     if (process == 0) {
         // original parent process
         message.key_number = -1;
@@ -130,10 +127,7 @@ int main(int argc,  char *argv[])
                 // print results to user
                 fprintf(stderr, "\nOK: enc/dec ok for \"%s\"\n", plaintext);
 	            fprintf(stderr, "Key No.:%ld:", message.key_number);
-                int y;
-	            for (y = 0; y < 32; y++)
-	                fprintf (stderr, "%c", message.key[y]);
-	            fprintf(stderr, "\n");
+                print_message(message.key, KEY_LENGTH);
                 
                 // free memory
                 free(plaintext);
@@ -168,15 +162,19 @@ int main(int argc,  char *argv[])
                 // send key to next process
                 if (write(STDOUT_FILENO, &message, message_size) < 0)
                     fprintf(stderr, "Error writing");
+
+                // clear buffer
+                read(STDIN_FILENO, &message, message_size);
                 
                 // free memory
                 free(plaintext);
                 free(plain_in);
                 free(cipher_in);
 
-                // clear buffer
-                read(STDIN_FILENO, &message, message_size);
-
+                // wait for any child processes                
+                if (wait_for_child(childpid) < 0)
+                    exit(EXIT_FAILURE);
+                
                 exit(EXIT_SUCCESS);
             }
 
@@ -191,9 +189,13 @@ int main(int argc,  char *argv[])
         } 
     }
 
-    // free memory 
+    // free memory
     free(plain_in);
     free(cipher_in);
 
+    // wait for any child processes
+    if (wait_for_child(childpid) < 0)
+        exit(EXIT_FAILURE);
+    
     exit(EXIT_SUCCESS);
 }

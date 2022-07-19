@@ -10,6 +10,8 @@
 /* Successful operation */
 #define SUCCESS 0
 
+#define ARG_LENGTH 5
+
 /* Maximum key length */
 #define KEY_LENGTH 32
 #define TRIAL_LENGTH 32
@@ -30,5 +32,7 @@ int test_key(unsigned long, unsigned long, char **, unsigned char *, int,
             unsigned char [], int);
 int aes_init(unsigned char *, int, EVP_CIPHER_CTX *, EVP_CIPHER_CTX *);
 unsigned char * aes_decrypt(EVP_CIPHER_CTX *, unsigned char *, int *);
+void print_message(unsigned char *, int);
+int wait_for_child(int);
 
 #endif
