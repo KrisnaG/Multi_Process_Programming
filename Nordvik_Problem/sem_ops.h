@@ -1,8 +1,12 @@
 /**
  * @file sem_ops.h
- * @author your name (you@domain.com)
- * @brief modified version of the sem_ops.h which is the simplified 
- * semaphore operations in, 'Advanced UNIX Programming', M.J. Rochkind
+ * @author Krisna Gusti (kgusti@myune.edu.au)
+ * @brief 
+ * 
+ * This file is a modified version of the sem_ops.h which is the simplified 
+ * semaphore operations in, 'Advanced UNIX Programming', M.J. Rochkind.
+ * 
+ * It has modified to return any errors produced.
  * 
  */
 
@@ -10,7 +14,7 @@
 
 
 /**
- * @brief returns the semaphore id (system wide) of the
+ * @brief Returns the semaphore id (system wide) of the
  * semaphore number you give. If no semaphore has been
  * established for this number, one is created
  * 
@@ -19,16 +23,16 @@
  */
 int semtran(int key) 
 {
-  return semget((key_t)key, 1, 0666 | IPC_CREAT);;
+  return semget((key_t)key, 1, 0666 | IPC_CREAT);
 }
 
 
 /**
- * @brief applies the operation to the semaphore
+ * @brief Applies the operation to the semaphore
  * 
- * @param sid 
- * @param op 
- * @return int 
+ * @param sid semaphore id
+ * @param op operation to conduct
+ * @return int - 0 on success, -1 on failure 
  */
 static int semcall(int sid, int op)
 {
@@ -43,11 +47,11 @@ static int semcall(int sid, int op)
 
 
 /**
- * @brief the semaphore signal operation. sid must be the system
+ * @brief The semaphore signal operation. sid must be the system
  * wide semaphore number returned by semtran above
  * 
- * @param sid 
- * @return int 
+ * @param sid semaphore id to signal
+ * @return int - 0 on success, -1 on failure 
  */
 int P_WAIT(int sid) 
 {
@@ -59,8 +63,8 @@ int P_WAIT(int sid)
  * @brief The semaphore release operation. sid must be the system
  * wide semaphore number returned by semtran above.
  * 
- * @param sid 
- * @return int 
+ * @param sid semaphore id to release
+ * @return int - 0 on success, -1 on failure
  */
 int V_POST(int sid) 
 {
@@ -69,10 +73,10 @@ int V_POST(int sid)
 
 
 /**
- * @brief remove a semaphore from the system. sid must be the
+ * @brief Removes a semaphore from the system. sid must be the
  * system wide semaphore returned from semtran
  * 
- * @param sid 
+ * @param sid semaphore id to remove
  */
 void rm_sem(int sid) 
 {
