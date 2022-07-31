@@ -53,7 +53,7 @@ static int semcall(int sid, int op)
  * @param sid semaphore id to signal
  * @return int - 0 on success, -1 on failure 
  */
-int P_WAIT(int sid) 
+int sem_wait(int sid) 
 {
   return (semcall(sid, -1));
 }
@@ -66,7 +66,7 @@ int P_WAIT(int sid)
  * @param sid semaphore id to release
  * @return int - 0 on success, -1 on failure
  */
-int V_POST(int sid) 
+int sem_release(int sid) 
 {
   return (semcall( sid, 1 ));
 }

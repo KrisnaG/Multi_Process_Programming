@@ -5,7 +5,6 @@
  */
 
 #include <pthread.h>
-#include "sem_ops.h"
 #include "nordvik_util.h"
 
 #define NUM_CARS_EAST 4
@@ -20,16 +19,6 @@ int main(int argc, char *argv[])
     thread_info_t trucks_east[NUM_TRUCKS_EAST];
     thread_info_t trucks_west[NUM_TRUCKS_WEST];
     locks_counters_t lock_counter;
-
-    /*  */
-    if ((lock_counter.bridge_lock = semtran(IPC_PRIVATE)) < 0) 
-        handle_error("Unable to get semaphore for brick lock");
-
-    if ((lock_counter.car_east_lock = semtran(IPC_PRIVATE)) < 0)
-        handle_error("Unable to get semaphore for car east lock");
-
-    if ((lock_counter.car_west_lock = semtran(IPC_PRIVATE)) < 0)
-        handle_error("Unable to get semaphore for car west lock");
 
     /*  */
     if (initialise_locks_counters(&lock_counter))
@@ -62,7 +51,8 @@ int main(int argc, char *argv[])
         handle_error("");
 
     /* clean up */
-    if (cleanup())
+    if (cleanup(&lock_counter))
+        handle_error("");
 
     exit(EXIT_SUCCESS);
 }

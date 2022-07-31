@@ -9,7 +9,7 @@
 #define FAILURE -1          /* Failed operation */
 #define MAXWAIT 20          /* Maximum initial waiting time */
 #define CROSSINGTIME 4      /* Time for a vehicle to cross bridge */
-#define BRIDGE_WEIGHT 4     /* Amount of cars allowed on bridge at once */
+#define BRIDGE_WEIGHT 3     /* Amount of cars allowed on bridge at once */
 
 /*  */
 #define INITAL_WAIT_TIME sleep( rand() % MAXWAIT )
@@ -21,11 +21,11 @@
 /*  */
 typedef struct locks_counters_t 
 {
-    int bridge_lock;                    /*  */
-    int car_east_lock;                  /*  */
-    int car_west_lock;                  /*  */
-    int car_east_count;                 /*  */
-    int car_west_count;                 /*  */
+    int bridge_lock;                    /* bridge semaphore lock */
+    int car_east_lock;                  /* car east semaphore lock */
+    int car_west_lock;                  /* car west semaphore lock */
+    int car_east_count;                 /* number of cars currently traveling east */
+    int car_west_count;                 /* number of cars currently traveling west */
 } locks_counters_t;
 
 /*  */
@@ -46,6 +46,6 @@ void * truck_traveling_west(void *);
 int initialise_locks_counters(locks_counters_t *);
 int create_and_run_thread(thread_info_t *, int, locks_counters_t *, void *(*)(void *));
 int wait_for_thread(thread_info_t *, int );
-int cleanup();
+int cleanup(locks_counters_t *lock_counter);
 
 #endif
