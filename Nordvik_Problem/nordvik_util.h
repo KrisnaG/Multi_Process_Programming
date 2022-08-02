@@ -22,8 +22,10 @@
 typedef struct locks_counters_t 
 {
     int bridge_lock;                    /* bridge semaphore lock */
-    int car_east_lock;                  /* car east semaphore lock */
-    int car_west_lock;                  /* car west semaphore lock */
+    int east_lock;                      /* car east semaphore lock */
+    int west_lock;                      /* car west semaphore lock */
+    int car_east_limit;                 /*  */
+    int car_west_limit;                 /*  */
     int car_east_count;                 /* number of cars currently traveling east */
     int car_west_count;                 /* number of cars currently traveling west */
 } locks_counters_t;

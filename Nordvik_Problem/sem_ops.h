@@ -73,12 +73,13 @@ int sem_release(int sid)
 
 
 /**
- * @brief Removes a semaphore from the system. sid must be the
+ * @brief  Removes a semaphore from the system. sid must be the
  * system wide semaphore returned from semtran
  * 
  * @param sid semaphore id to remove
+ * @return int 
  */
-void rm_sem(int sid) 
+int rm_sem(int sid) 
 {
-  (void)semctl( sid, 0, IPC_RMID, 0 );
+  return semctl( sid, 0, IPC_RMID, 0 );
 }
