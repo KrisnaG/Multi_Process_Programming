@@ -1,3 +1,6 @@
+# makefile for nordvik
+# author: Krisna Gusti (kgusti@myune.edu.au)
+
 COMPILER = gcc
 CFLAGS = -Wall -pedantic -g
 COBJS = nordvik_util.o
@@ -11,6 +14,8 @@ nordvik: nordvik.c ${COBJS}
 
 %.o: %.c %.h  makefile
 	${COMPILER} ${CFLAGS} $< -c -pthread
+
+build: clean ${CEXES}
 
 clean:
 	rm -f *.o *~ ${CEXES}

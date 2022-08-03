@@ -1,17 +1,20 @@
 /**
  * @file sem_ops.h
  * @author Krisna Gusti (kgusti@myune.edu.au)
- * @brief 
+ * @brief Operations to conduct on semaphores.
  * 
- * This file is a modified version of the sem_ops.h which is the simplified 
- * semaphore operations in, 'Advanced UNIX Programming', M.J. Rochkind.
+ * This file is a modified version of the sem_ops.h used in lectures and 
+ * tutorials, which is the simplified semaphore operations in, 
+ * 'Advanced UNIX Programming', M.J. Rochkind.
  * 
  * It has modified to return any errors produced.
  * 
  */
 
-#include <sys/sem.h>
+#ifndef SEM_OPS_H
+#define SEM_OPS_H
 
+#include <sys/sem.h>
 
 /**
  * @brief Returns the semaphore id (system wide) of the
@@ -83,3 +86,5 @@ int rm_sem(int sid)
 {
   return semctl( sid, 0, IPC_RMID, 0 );
 }
+
+#endif
