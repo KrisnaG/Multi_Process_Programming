@@ -1,5 +1,5 @@
 /**
- * @file blur.c
+ * @file convolution.c
  * @author Krisna Gusti (kgusti@myune.edu.au)
  * @brief 
  * 
@@ -21,40 +21,34 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <fcntl.h>
 
-
-#define SUCCESS 0
-#define FAILURE -1
-#define ARG_LENGTH 3
-#define MAIN_PROCESS 0
+#define SUCCESS 0           /*  */
+#define FAILURE -1          /*  */
+#define ARG_LENGTH 5        /*  */
+#define MAIN_PROCESS 0      /*  */
 
 /* Prints out error message passed and exits */
-#define handle_error(msg) \
-    do { fprintf(stderr,"%s\n", msg); MPI_Finalize(); exit(EXIT_FAILURE); } while (0)
+void handle_error(char * msg) {
+    fprintf(stderr,"%s\n", msg); 
+    MPI_Finalize(); 
+    exit(EXIT_FAILURE);
+}
 
 
-int get_user_input(int rank, int argc,  char *argv[], char *input, char *output, int *depth)
+int parse_args(int rank, int argc, char *argv[], int *depth, int *size, int *fd)
 {
     // main process
     if (rank == MAIN_PROCESS) {
-        if (argc != ARG_LENGTH || (*depth = atoi(argv[2])) <= 0) {
-            fprintf(stderr, 
-                    "Usage: %s -np <number of processes> <depth> <input file> <output file>\n", 
-                    argv[0]);
+        // check inputs and files
+        if (argc != ARG_LENGTH || 
+           (*depth = atoi(argv[1])) <= 0 ||
+           (*size = atoi(argv[2])) <= 0 ||
+           (fd[0] = open(argv[3], O_RDONLY)) <= 0 ||
+           (fd[1] = open(argv[4], O_WRONLY)) <= 0 ) {
             return FAILURE;
         }
-        input = argv[2];
-        output = argv[3];
     }
-    return SUCCESS;
-}
-
-int read_file(char *filename, char **buffer)
-{
-    FILE *file;
-
-
-
     return SUCCESS;
 }
 
@@ -67,24 +61,34 @@ int main(int argc, char** argv)
     int nproc;                  /* Number of processes */
     int me;                     /* Process rank ID */
     int depth;                  /* Depth of weighted sum */
-    char * input_file;          /* Input file to read from */
-    char * output_file;         /* Output file to write to */
+    int matrix_size;            /*  */
+    int fd[2];                  /*  */
 
     // setup MPI
-    if (MPI_Init(&argc, &argv) == -1)
+    if (MPI_Init(&argc, &argv) < 0)
         handle_error("Unable to intialise MPI");
 
-    if (MPI_Comm_rank(MPI_COMM_WORLD, &me) == -1)
+    // set process rank
+    if (MPI_Comm_rank(MPI_COMM_WORLD, &me) < 0)
         handle_error("Unalbe to determine the rank of the calling processor with the communicator");
 
-    if (MPI_Comm_size(MPI_COMM_WORLD, &nproc) == -1)
+    // set number of processes
+    if (MPI_Comm_size(MPI_COMM_WORLD, &nproc) < 0)
         handle_error("Unalbe to determine the processors associated with communicator");
 
-    // TODO: validate user input
-    if (get_user_input(me, argc, argv, &input_file, &output_file, &depth) == -1)
-        handle_error("Invalid user input");
+    // get command line arguments
+    if (parse_args(me, argc, argv, &depth, &matrix_size, fd) < 0)
+        handle_error("Usage: mpirun -np <number of processes> ./convolution <depth> <matrix size> "
+                     "<input filename> <output filename>");
 
-    // TODO: Extract data from file
+    // broadcast matrix size and depth
+    if ((MPI_Bcast (&matrix_size, 1, MPI_INT, MAIN_PROCESS, MPI_COMM_WORLD)) < 0 || 
+        (MPI_Bcast (&depth, 1, MPI_INT, MAIN_PROCESS, MPI_COMM_WORLD)) < 0)
+        handle_error("Unable to broadcast matrix size and depth to all processes");
+
+    // row / nproc = process block to calculate
+
+    // TODO: Get rows
 
     // TODO: conduct task
 

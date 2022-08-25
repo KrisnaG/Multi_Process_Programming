@@ -3,15 +3,24 @@
 
 COMPILER = mpicc
 CFLAGS = -Wall -pedantic
-CEXES = convolution
+CEXES = convolution getMatrix mkRandomMatrix
 #COBJS = 
-PROGRAM = convolution 
+PROGRAM = convolution
 
 all: clean ${CEXES} run
 
 convolution: convolution.c
 	${COMPILER} ${CFLAGS} convolution.c -o convolution
 
+getMatrix:   getMatrix.c matrix.o
+	gcc ${CFLAGS} getMatrix.c matrix.o -o getMatrix
+
+mkRandomMatrix:    mkRandomMatrix.c  matrix.o
+	gcc ${CFLAGS} mkRandomMatrix.c matrix.o -o mkRandomMatrix
+
+matrix.o: matrix.c
+	${COMPILER} ${CFLAGS} -c matrix.c
+	
 %.o: %.c %.h  makefile
 	${COMPILER} ${CFLAGS} $< -c 
 
@@ -22,4 +31,4 @@ clean:
 	rm -f *.o *~ ${CEXES}
 
 run: 
-	./${PROGRAM}
+	mpirun -np 2 ${PROGRAM} 1 3 input_file output_file
