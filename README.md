@@ -16,3 +16,9 @@ The brute-force search is conducted with parallel processes arranged in a "ring-
 The road to Nordvik carries traffic (cars and trucks) in both directions, except at a 1 lane suspension bridge. <br> 
 The bridge is only wide enough to carry traffic in one direction at a time. Only one truck is allowed on the bridge at anytime. <br>
 This program uses threads to act as vehicles (cars and trucks), that crosses the Nordvik bridge which acts as a shared resource.
+
+### MPI Matrix weighted sum (blur)
+A C program using MPI that can process a square data matrix using a convolution filter that replaces each element with the weighted sum of its neighbours. Each element's contribution to the sum should be weighted by 1/n_depth, where the n_depth is the neighbourhood depth of the specific element.
+
+### CUDA Mandelbrot
+A parallel implementation of the Mandelbrot algorithm using Nvidia CUDA C that produces bitmap images which contain the fractal representation of the Mandelbrot set. 
